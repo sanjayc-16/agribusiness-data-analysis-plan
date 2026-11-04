@@ -104,7 +104,7 @@ This is a planning task, so the results are the completed plan components:
 
 Carry out Stage 1 (scoping), start the source evaluation, then collect and clean the data to begin the analysis phase.
 
-## 🖼️ Screenshot
+## 🖼️ Grab
 
 ![RStudio workspace](workflow.png)
 
