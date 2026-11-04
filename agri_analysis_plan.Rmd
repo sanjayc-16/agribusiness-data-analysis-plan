@@ -1,0 +1,428 @@
+---
+title: "Agribusiness Data Analysis Planning"
+subtitle: "A Structured Plan for Collecting and Analyzing Public Agriculture Market Data"
+author: "Sanjay C"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  word_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_width: 6.5
+    fig_height: 3.5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(knitr)
+library(ggplot2)
+```
+
+# Introduction
+
+## Purpose of This Document
+
+Agriculture is a data-rich but decision-poor sector. Farmers, traders, processors and policy makers must decide what to plant, when to sell and how much input to buy, often with little more than last season's experience to guide them. Large volumes of **free, public data** on crop production, market prices, weather and input use exist, but they are scattered across many agencies, in different formats and with different levels of quality.
+
+This document is a **plan, not an analysis**. It describes how publicly available agribusiness data will be identified, collected, cleaned, analyzed and interpreted in order to **forecast agricultural market trends**. It sets out the research rationale, the data sources, the key metrics, a step-by-step method, a realistic timeline and the risks that could affect delivery.
+
+## Objectives
+
+- Identify reliable public data sources on agriculture market trends.
+- Define the key indicators: crop yields, price dynamics and resource utilization.
+- Design a repeatable workflow for collection, cleaning, analysis and interpretation.
+- Build a realistic timeline with clear milestones.
+- Explain how the results can support real agribusiness decisions.
+
+## Scope of the Planned Study
+
+| Element | Decision |
+|:--------|:---------|
+| Focus crops | Rice, wheat, maize and one pulse or oilseed (e.g., groundnut), chosen for data availability and market importance |
+| Geography | India (national and state level, with Tamil Nadu as a detailed example); global series for context |
+| Time horizon | Roughly 2000 to the latest available year for annual data; 5 to 10 years for daily or monthly market prices |
+| Main question | *Which factors drive price and yield movements, and how well can near-term prices be forecast?* |
+| Unit of analysis | Crop-state-year (annual) and crop-market-month (prices) |
+
+# Research Rationale
+
+## Why Agribusiness Forecasting Matters
+
+- **Food security:** Early warning of shortages or gluts helps governments plan buffer stocks, imports and exports.
+- **Farm income:** Price risk is one of the largest risks a farmer faces. Knowing likely price direction supports better planting and selling decisions.
+- **Supply chain efficiency:** Processors, warehouses and logistics firms can plan capacity and procurement when trends are anticipated.
+- **Climate risk:** Rainfall variability and temperature extremes directly affect yield, so weather must be part of any serious agricultural analysis.
+- **Input cost management:** Fertilizer and fuel prices change the economics of cultivation and can shift crop choices.
+
+## Why Public Data?
+
+- **Free and accessible:** No licence cost, which suits a student or small-business context.
+- **Credible:** Data published by statistical agencies and international organizations follows documented methods.
+- **Reproducible:** Anyone can download the same files and verify the analysis.
+- **Long history:** Many series run for decades, which is essential for seasonal and trend analysis.
+
+## Guiding Research Questions
+
+1. How have yield, area and production of the selected crops changed over time?
+2. What are the seasonal and long-term patterns in market prices?
+3. How strongly do rainfall, temperature and input costs relate to yield and price?
+4. Which simple forecasting approaches perform best for short-term price prediction?
+5. What practical recommendations follow for farmers, traders or planners?
+
+# Proposed Data Sources
+
+## Source Inventory
+
+The table below lists the candidate sources. Each will be checked for coverage, update frequency, licence and format before it is adopted.
+
+```{r sources-table}
+sources <- data.frame(
+  Source = c(
+    "FAOSTAT (FAO)",
+    "Ministry of Agriculture & Farmers Welfare / Directorate of Economics and Statistics (India)",
+    "Agmarknet (via data.gov.in)",
+    "USDA Foreign Agricultural Service (PSD) and NASS",
+    "World Bank Commodity Price Data (Pink Sheet) and World Development Indicators",
+    "India Meteorological Department (IMD)",
+    "NASA POWER / Open-Meteo",
+    "FAO Fertilizer and input statistics; Fertiliser Association of India reports"
+  ),
+  Data = c(
+    "Production, yield, area harvested, trade, producer prices by country",
+    "State and district crop area, production, yield; minimum support prices",
+    "Daily mandi (market) arrivals and modal, minimum and maximum prices",
+    "Global supply and demand balances; US crop statistics for benchmarking",
+    "Monthly global commodity prices; macro indicators",
+    "Rainfall and temperature, monsoon summaries",
+    "Gridded daily rainfall, temperature, solar radiation",
+    "Fertilizer consumption and prices; resource use"
+  ),
+  Frequency = c("Annual", "Annual / seasonal", "Daily", "Monthly / annual", "Monthly / annual",
+                "Daily / monthly", "Daily", "Annual"),
+  Format = c("CSV, bulk download, API", "CSV, XLS, PDF reports", "CSV, API (key required)",
+             "CSV, XLS", "XLS, CSV, API", "CSV, gridded files", "CSV, JSON API", "XLS, PDF"),
+  Use = c("Yield and production trends", "Regional yield and production", "Price dynamics",
+          "Global context", "Global price drivers", "Weather drivers", "Weather drivers",
+          "Resource utilization")
+)
+kable(sources, caption = "Candidate public data sources")
+```
+
+## Source Evaluation Criteria
+
+Each source will be scored before use against five criteria:
+
+- **Relevance:** Does it measure a planned metric directly?
+- **Coverage:** Does it cover the chosen crops, regions and years?
+- **Timeliness:** How recently is it updated?
+- **Quality:** Is the methodology documented, and are there large gaps or revisions?
+- **Accessibility:** Can it be downloaded or called through an API without cost?
+
+## Data Collection Methods
+
+- **Bulk downloads:** FAOSTAT and World Bank files will be downloaded as CSV or Excel and stored unchanged in a `data/raw/` folder.
+- **APIs:** Weather data (NASA POWER, Open-Meteo) and, where allowed, market prices will be pulled with R packages such as `httr` and `jsonlite`.
+- **Manual download:** Where portals require interactive selection (some state portals), files will be downloaded manually, and the download date and query settings recorded.
+- **Documentation:** A data log will record for each file its source URL, access date, version, licence and any known limitations.
+
+# Key Metrics and Indicators
+
+## Crop Production Metrics
+
+```{r metrics-production}
+m1 <- data.frame(
+  Metric = c("Yield", "Area harvested", "Production", "Yield growth rate", "Yield variability"),
+  Definition = c("Output per unit area (e.g., tonnes per hectare)",
+                 "Land actually harvested (hectares)",
+                 "Total output (tonnes)",
+                 "Year-on-year or compound annual percentage change in yield",
+                 "Coefficient of variation of yield over a rolling window"),
+  `Why it matters` = c("Core measure of productivity",
+                       "Shows expansion or contraction of cultivation",
+                       "Drives market supply",
+                       "Indicates technology and management improvement",
+                       "Proxy for production risk"),
+  check.names = FALSE
+)
+kable(m1, caption = "Crop production metrics")
+```
+
+## Pricing Dynamics Metrics
+
+```{r metrics-price}
+m2 <- data.frame(
+  Metric = c("Modal / average price", "Price spread (max - min)", "Month-on-month change",
+             "Seasonal index", "Price volatility", "Price-to-MSP ratio", "Market arrivals"),
+  Definition = c("Typical market price in a period",
+                 "Range of prices within a market and period",
+                 "Percentage change from previous month",
+                 "Ratio of a month's average price to the annual average",
+                 "Standard deviation of log returns over a rolling window",
+                 "Market price divided by government minimum support price",
+                 "Quantity brought to market"),
+  `Why it matters` = c("Primary forecasting target",
+                       "Indicates market uncertainty",
+                       "Captures short-term momentum",
+                       "Reveals harvest-time price lows and lean-season highs",
+                       "Measures price risk",
+                       "Shows whether support prices are binding",
+                       "Supply signal that often leads prices"),
+  check.names = FALSE
+)
+kable(m2, caption = "Pricing dynamics metrics")
+```
+
+## Resource Utilization Metrics
+
+```{r metrics-resource}
+m3 <- data.frame(
+  Metric = c("Fertilizer use per hectare", "Irrigated area share", "Rainfall (seasonal total)",
+             "Rainfall deviation from normal", "Temperature extremes", "Input cost index"),
+  Definition = c("Fertilizer consumed divided by cropped area",
+                 "Irrigated area divided by total cropped area",
+                 "Total rainfall during the crop season",
+                 "Percentage departure from the long-term average",
+                 "Number of days above a heat threshold during key growth stages",
+                 "Index combining fertilizer, fuel and labour cost proxies"),
+  `Why it matters` = c("Intensity of input use",
+                       "Reduces dependence on monsoon",
+                       "Primary natural driver of yield",
+                       "Flags drought or excess rain years",
+                       "Heat stress reduces yield",
+                       "Affects profitability and supply response"),
+  check.names = FALSE
+)
+kable(m3, caption = "Resource utilization metrics")
+```
+
+## Derived and Economic Indicators
+
+- **Gross margin proxy:** price multiplied by yield minus an estimated input cost per hectare.
+- **Supply-demand balance:** production plus imports minus exports and consumption (global data from USDA PSD).
+- **Lagged variables:** previous season's price and arrivals, used as predictors because farmers plant based on past prices.
+
+# Step-by-Step Analysis Plan
+
+The workflow has six stages. Each stage ends with a checkpoint so that errors are found early.
+
+## Stage 1: Define and Scope
+
+- Finalize crops, regions, years and the specific forecasting target (for example, next-month modal price of rice in selected markets).
+- Write the research questions and success criteria (for example, forecast error below a benchmark naive model).
+- Set up the project structure: `data/raw`, `data/clean`, `scripts`, `outputs`, `docs`.
+
+## Stage 2: Collect Data
+
+- Download or request each approved source and save the **untouched originals** in `data/raw/`.
+- Record every source in the data log (URL, date, licence, variables).
+- Check file integrity: row counts, date ranges and variable names.
+
+Example of the intended R approach (shown for illustration, not executed here):
+
+```{r collect-example, echo=TRUE, eval=FALSE}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+
+# 1. Bulk CSV from FAOSTAT saved manually into data/raw/
+fao <- read_csv("data/raw/faostat_crops.csv")
+
+# 2. Daily weather from a public API (illustrative request)
+resp <- GET("https://power.larc.nasa.gov/api/temporal/daily/point",
+            query = list(parameters = "PRECTOTCORR,T2M",
+                         community = "AG",
+                         latitude = 13.0, longitude = 80.2,
+                         start = 20150101, end = 20241231,
+                         format = "JSON"))
+weather <- fromJSON(content(resp, "text"))
+```
+
+## Stage 3: Clean and Prepare
+
+Cleaning is expected to take the largest share of the effort, since data from different agencies rarely aligns.
+
+- **Standardize names and units:** consistent crop names, tonnes versus quintals, hectares versus thousand hectares, financial year versus calendar year.
+- **Handle missing values:** document the amount missing, then choose between removal, interpolation for short gaps in time series, or leaving as missing where imputation would mislead.
+- **Detect outliers:** inspect with boxplots and rolling statistics; verify unusual prices against source notes before removing anything.
+- **Fix types and dates:** convert text dates, create month and season variables.
+- **Harmonize geography:** align state and market names across sources using a lookup table.
+- **Merge:** join yield, price and weather tables at common keys (crop, region, year or month).
+- **Save:** write cleaned files to `data/clean/` and keep the cleaning script so every step is reproducible.
+
+```{r clean-example, echo=TRUE, eval=FALSE}
+prices_clean <- prices_raw %>%
+  rename_with(tolower) %>%
+  mutate(date = as.Date(date, format = "%d/%m/%Y"),
+         modal_price = as.numeric(modal_price)) %>%
+  filter(!is.na(modal_price), modal_price > 0) %>%
+  group_by(commodity, market, month = floor_date(date, "month")) %>%
+  summarise(avg_modal = mean(modal_price), arrivals = sum(arrivals, na.rm = TRUE),
+            .groups = "drop")
+```
+
+## Stage 4: Explore the Data
+
+- **Summary statistics** for every metric by crop and region.
+- **Trend plots:** yield and production over time; price series with moving averages.
+- **Seasonality:** monthly price indices and seasonal decomposition (trend, seasonal, remainder).
+- **Relationships:** correlation matrices and scatter plots of yield against rainfall, fertilizer use and irrigation; price against arrivals.
+- **Regional comparison:** compare states or markets to find high and low performers.
+
+## Stage 5: Model and Forecast
+
+A simple-to-complex approach will be used so that added complexity must justify itself.
+
+| Level | Method | Purpose |
+|:------|:-------|:--------|
+| Baseline | Naive and seasonal naive forecast | Benchmark every other model must beat |
+| Statistical | Linear and multiple regression of yield on rainfall, fertilizer, irrigation | Explain yield drivers |
+| Time series | ETS and ARIMA (via the `forecast` package) | Short-term price forecasts |
+| Extended | ARIMA with external regressors (rainfall, arrivals) | Test whether drivers improve forecasts |
+
+- **Validation:** hold out the most recent 12 months; use rolling-origin cross-validation for time series.
+- **Accuracy measures:** MAE, RMSE and MAPE, always compared with the naive baseline.
+- **Diagnostics:** check residuals for autocorrelation and non-constant variance.
+
+## Stage 6: Interpret and Communicate
+
+- Translate statistics into plain language: what changed, by how much and why it matters.
+- Distinguish **correlation from causation**, and state assumptions clearly.
+- Present forecasts with **prediction intervals**, not single numbers.
+- Provide decision-oriented recommendations, such as the best selling window or the crops most exposed to rainfall risk.
+- Report limitations honestly (see the Risks and Limitations section).
+
+## Quality Assurance Checklist
+
+- [ ] Every raw file is stored unchanged with source and date logged.
+- [ ] Every cleaning step is scripted and can be rerun from scratch.
+- [ ] Units and time periods are consistent across merged tables.
+- [ ] Models are compared against a naive baseline.
+- [ ] Results are checked against official published totals where possible.
+- [ ] Charts have titles, labelled axes and units.
+
+# Tools and Reproducibility
+
+```{r tools-table}
+tools <- data.frame(
+  Purpose = c("Programming and reporting", "Data wrangling", "Visualization", "Time series forecasting",
+              "Data access", "Documentation", "Version control", "Environment"),
+  Tool = c("R and RStudio / Posit Cloud, R Markdown", "tidyverse (dplyr, tidyr, lubridate, readr)",
+           "ggplot2", "forecast, tseries", "httr, jsonlite, readxl", "R Markdown, knitr (Word output)",
+           "Git and GitHub", "renv or `sessionInfo()` recorded in the report")
+)
+kable(tools, caption = "Planned tools")
+```
+
+A GitHub repository will hold the scripts, data log, folder structure and README so that the analysis can be reproduced by anyone.
+
+# Project Timeline
+
+## Timeline Table
+
+The plan assumes about **four weeks (20 working days)**. A buffer is included because data access issues are the most common cause of delay.
+
+```{r timeline-data}
+tl <- data.frame(
+  Phase = c("1. Scope and setup", "2. Source identification", "3. Data collection",
+            "4. Cleaning and merging", "5. Exploration", "6. Modelling and forecasting",
+            "7. Interpretation and report", "8. Buffer, review, submission"),
+  Task = c("Finalize crops, regions, questions; create project structure",
+           "Evaluate sources; build data log",
+           "Download files; call APIs; verify integrity",
+           "Standardize, handle missing values, merge tables",
+           "Summary statistics, trends, seasonality, correlations",
+           "Baseline, regression and ARIMA models; validation",
+           "Insights, recommendations, limitations, final write-up",
+           "Proofreading, formatting, GitHub upload"),
+  Start = c(1, 2, 4, 7, 11, 14, 17, 19),
+  End   = c(2, 4, 7, 11, 14, 17, 19, 20),
+  Milestone = c("Approved scope document", "Final source list with data log", "All raw data stored",
+                "Clean merged dataset", "EDA charts and findings", "Validated forecasts",
+                "Draft report complete", "Final submission")
+)
+display <- tl
+display$Days <- paste0("Day ", tl$Start, " to Day ", tl$End)
+kable(display[, c("Phase", "Task", "Days", "Milestone")], caption = "Project timeline with milestones")
+```
+
+## Timeline Chart
+
+```{r timeline-chart, fig.cap="Planned schedule by phase (working days)"}
+tl$Phase <- factor(tl$Phase, levels = rev(tl$Phase))
+ggplot(tl, aes(y = Phase)) +
+  geom_segment(aes(x = Start, xend = End, yend = Phase), linewidth = 6, colour = "#2E7D32") +
+  scale_x_continuous(breaks = seq(0, 20, 2)) +
+  labs(x = "Working day", y = NULL) +
+  theme_minimal(base_size = 11)
+```
+
+## Milestone Review Points
+
+- **End of Week 1:** scope fixed and sources confirmed. If a key source is unavailable, switch to the backup source.
+- **End of Week 2:** clean dataset ready. No modelling starts before this point.
+- **End of Week 3:** forecasts validated against the baseline.
+- **End of Week 4:** final report reviewed and submitted.
+
+# Risks and Mitigation
+
+```{r risk-table}
+risks <- data.frame(
+  Risk = c("Data unavailable or portal down", "Inconsistent units or definitions across sources",
+           "Large gaps in price data", "Overfitting with limited history",
+           "Structural breaks (policy changes, export bans, COVID-19)", "Time overrun"),
+  Likelihood = c("Medium", "High", "Medium", "Medium", "High", "Medium"),
+  Mitigation = c("Identify a backup source for every metric; keep local copies of raw files",
+                 "Build unit and name lookup tables early; document every conversion",
+                 "Limit to markets with consistent reporting; use short-gap interpolation only",
+                 "Start with simple models; use rolling validation and a naive benchmark",
+                 "Flag disruption periods; test models with and without them",
+                 "Use the buffer days; cut optional extended models first")
+)
+kable(risks, caption = "Key risks and mitigation")
+```
+
+# Expected Outcomes and Business Value
+
+- A **clean, documented, reproducible dataset** combining yield, price and weather information.
+- **Descriptive insights** into long-term productivity trends and seasonal price patterns.
+- **Short-term price forecasts** with stated accuracy and uncertainty.
+- **Practical recommendations**, for example the months when prices typically peak, or the crops most sensitive to rainfall shortfalls.
+- A **reusable template** that can be rerun when new data is released.
+
+| Stakeholder | How they could use the results |
+|:------------|:-------------------------------|
+| Farmers and FPOs | Plan crop choice and timing of sales |
+| Traders and processors | Plan procurement and storage |
+| Policy makers | Anticipate shortages and calibrate support measures |
+| Lenders and insurers | Assess price and yield risk |
+
+# Limitations
+
+- Public data may be **delayed, revised or aggregated**, which limits precision at farm level.
+- Price data reflect **market (mandi) prices**, not necessarily what individual farmers receive.
+- Statistical relationships do not prove **cause and effect**.
+- Forecasts become less reliable for long horizons and during unexpected shocks such as policy changes or extreme weather.
+- Findings for the selected crops and regions may not generalize to others.
+
+# Conclusion
+
+This plan sets out a practical, realistic way to turn scattered public agriculture data into insight about market trends. It defines what will be measured (yield, price dynamics and resource use), where the data will come from, how it will be cleaned and analyzed, and when each step will be completed. By starting from a naive benchmark, documenting every step and building in a buffer for data problems, the approach keeps the project achievable within the available time while still producing results that matter to farmers, traders and planners. The next step is to execute Stage 1 and begin the source evaluation.
+
+# References and Data Portals
+
+- Food and Agriculture Organization of the United Nations. *FAOSTAT*. fao.org/faostat
+- Government of India. *Open Government Data Platform (Agmarknet datasets)*. data.gov.in
+- Directorate of Economics and Statistics, Ministry of Agriculture and Farmers Welfare, India. *Agricultural Statistics*. desagri.gov.in
+- United States Department of Agriculture. *Production, Supply and Distribution (PSD) Online* and *NASS Quick Stats*. usda.gov
+- World Bank. *Commodity Markets (Pink Sheet)* and *World Development Indicators*. worldbank.org
+- India Meteorological Department. *Rainfall and temperature data*. imd.gov.in
+- NASA. *POWER Data Access Viewer*. power.larc.nasa.gov
+- Open-Meteo. *Historical Weather API*. open-meteo.com
+
+*Portal addresses and dataset availability should be re-checked before collection begins, as sites and access rules change.*
+
+# Appendix: Session Information
+
+```{r session-info, echo=TRUE}
+sessionInfo()
+```
